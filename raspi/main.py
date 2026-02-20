@@ -387,7 +387,10 @@ class PotholeDetectionSystem:
         INTERVAL = 1.0 / self.cfg.lidar.frame_hz          # 10 ms
         YOLO_SCAN_INTERVAL = 64                             # frames between YOLO sweeps
         LOG_DATA_INTERVAL = int(self.cfg.lidar.frame_hz)   # log data every ~1 second
+        NO_DATA_LOG_INTERVAL = 2.0                          # warn every 2s when no data
         next_tick = time.perf_counter()
+        last_no_data_log = 0.0                              # timestamp of last NoData warning
+        null_count = 0                                      # consecutive None reads
 
         road_z = 0.0                                        # road-profile Z accumulator
 
@@ -397,13 +400,32 @@ class PotholeDetectionSystem:
             # ── 1. Read LiDAR ─────────────────────────────────────────────
             raw_cm = self.lidar.get_distance_cm()
             if raw_cm is None:
-                # No valid frame yet: maintain timing
+                null_count += 1
+                now = time.time()
+                if now - last_no_data_log >= NO_DATA_LOG_INTERVAL:
+                    last_no_data_log = now
+                    l_stats = self.lidar.get_stats() if self.lidar else {}
+                    gps = self.gps.get_location() if self.gps else {}
+                    gps_fix = "✓ Fix" if gps.get("fixed") else "✗ No fix"
+                    self.log.warning(
+                        f"⏳ Waiting for LiDAR data … "
+                        f"(None reads: {null_count:,}) | "
+                        f"LiDAR stats → "
+                        f"frames parsed: {l_stats.get('total_frames', 0)}, "
+                        f"bad checksums: {l_stats.get('bad_checksums', 0)}, "
+                        f"out of range: {l_stats.get('out_of_range', 0)} | "
+                        f"GPS: {gps_fix} "
+                        f"({gps.get('lat', 0.0):.6f}, {gps.get('lon', 0.0):.6f})"
+                    )
+                # Maintain timing
                 next_tick += INTERVAL
                 sleep = next_tick - time.perf_counter()
                 if sleep > 0:
                     time.sleep(sleep)
                 continue
 
+            # Reset null counter on successful read
+            null_count = 0
             self._frame_count += 1
 
             # ── 2. Push to buffer ─────────────────────────────────────────
