@@ -2,5 +2,8 @@ pyserial>=3.5
 pynmea2>=1.18
 numpy>=1.24
 requests>=2.28
-ultralytics>=8.0
 opencv-python-headless>=4.8
+# NOTE: torch + ultralytics are installed separately by setup.sh
+# to ensure the correct ARM-compatible build is used on Raspberry Pi 4B.
+# Do NOT add torch/ultralytics here — pip will pull AVX2/ARMv8.2+ wheels
+# that cause SIGILL (Illegal Instruction) on the Cortex-A72 (ARMv8.0) CPU.

@@ -42,6 +42,13 @@ from typing import List, Optional
 
 import numpy as np
 
+# Import the YOLO availability flag from the detector module so the trainer
+# can bail out gracefully when PyTorch is incompatible (SIGILL guard).
+try:
+    from yolo_detector import _YOLO_AVAILABLE as _yolo_ok
+except ImportError:
+    _yolo_ok = None  # module not yet fully initialised
+
 logger = logging.getLogger("PotholeSystem.OnlineTrainer")
 
 # Synthesise a minimal depth image for an annotated sample
@@ -252,6 +259,23 @@ names:
     def _train_loop(self) -> None:
         """Actual fine-tuning; runs in a background thread."""
         import traceback
+
+        # ── SIGILL safety guard ───────────────────────────────────────────────
+        # Re-read the live flag every time (it may have been set by the probe).
+        try:
+            from yolo_detector import _YOLO_AVAILABLE as _live_ok
+        except ImportError:
+            _live_ok = _yolo_ok
+
+        if not _live_ok:
+            logger.warning(
+                "OnlineTrainer: YOLO / torch is unavailable on this device "
+                "(SIGILL guard active) — skipping training run."
+            )
+            with self._lock:
+                self._is_training = False
+            return
+        # ────────────────────────────────────────────────────────────────────
 
         logger.info("🏋️  YOLO online training started …")
         t0 = time.time()
