@@ -25,7 +25,7 @@ class LiDARConfig:
     baud: int = 115200                 # Factory default for TF-02 Pro
     timeout: float = 1.0              # Serial read timeout (seconds)
     max_range_cm: float = 1200.0      # TF-02 Pro spec: 12 m max
-    min_range_cm: float = 10.0        # TF-02 Pro spec: 10 cm min
+    min_range_cm: float = 1.0         # TF-02 Pro usable from ~1 cm
     sensor_height_cm: float = 20.0   # Height of LiDAR above road surface (cm)
                                       #   → subtract this from raw reading to get depth
     frame_hz: int = 100               # Sensor output rate (configurable via TFPA cmd)

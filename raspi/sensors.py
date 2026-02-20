@@ -43,8 +43,17 @@ class TF02ProLiDAR:
     FRAME_LEN = 9
     HEADER = (0x59, 0x59)
 
+    # Common UART ports on Raspberry Pi — tried in order if primary fails
+    FALLBACK_PORTS = [
+        "/dev/ttyAMA4",
+        "/dev/serial0",
+        "/dev/ttyAMA0",
+        "/dev/ttyUSB0",
+        "/dev/ttyS0",
+    ]
+
     def __init__(self, port: str, baud: int = 115200, timeout: float = 1.0,
-                 min_cm: float = 10.0, max_cm: float = 1200.0):
+                 min_cm: float = 1.0, max_cm: float = 1200.0):
         self._port = port
         self._baud = baud
         self._timeout = timeout
@@ -67,22 +76,64 @@ class TF02ProLiDAR:
     # ── private ──────────────────────────────────────────────────────────────
 
     def _connect(self) -> None:
-        try:
-            self._serial = serial.Serial(
-                self._port,
-                self._baud,
-                timeout=self._timeout,
-                bytesize=serial.EIGHTBITS,
-                parity=serial.PARITY_NONE,
-                stopbits=serial.STOPBITS_ONE,
-            )
-            logger.info(f"✓ TF-02 Pro initialised on {self._port} @ {self._baud} baud")
-            self._thread = threading.Thread(
-                target=self._read_loop, name="LiDAR-Reader", daemon=True
-            )
-            self._thread.start()
-        except serial.SerialException as exc:
-            logger.error(f"✗ TF-02 Pro could not open {self._port}: {exc}")
+        # Build list: configured port first, then fallbacks (no duplicates)
+        ports_to_try = [self._port]
+        for p in self.FALLBACK_PORTS:
+            if p not in ports_to_try:
+                ports_to_try.append(p)
+
+        for port in ports_to_try:
+            try:
+                logger.info(f"  Trying LiDAR on {port} @ {self._baud} baud …")
+                ser = serial.Serial(
+                    port,
+                    self._baud,
+                    timeout=self._timeout,
+                    bytesize=serial.EIGHTBITS,
+                    parity=serial.PARITY_NONE,
+                    stopbits=serial.STOPBITS_ONE,
+                )
+
+                # ── Probe: wait up to 2 s for TF-02 header (0x59 0x59) ────
+                if self._probe_port(ser, port):
+                    self._serial = ser
+                    self._port = port
+                    logger.info(f"✓ TF-02 Pro initialised on {port} @ {self._baud} baud")
+                    self._thread = threading.Thread(
+                        target=self._read_loop, name="LiDAR-Reader", daemon=True
+                    )
+                    self._thread.start()
+                    return
+                else:
+                    ser.close()
+                    logger.info(f"    {port}: opened OK but no LiDAR data detected")
+
+            except serial.SerialException as exc:
+                logger.debug(f"    {port}: could not open ({exc})")
+            except Exception as exc:
+                logger.debug(f"    {port}: unexpected error ({exc})")
+
+        logger.error(
+            f"✗ TF-02 Pro could not be found on any port: {ports_to_try}. "
+            f"Check wiring: LiDAR TX → Pi RX, power 5 V."
+        )
+
+    def _probe_port(self, ser: serial.Serial, port: str) -> bool:
+        """Read up to 2 s of data looking for a valid 0x59 0x59 frame header."""
+        import time as _time
+        deadline = _time.monotonic() + 2.0
+        buf = bytearray()
+        while _time.monotonic() < deadline:
+            chunk = ser.read(ser.in_waiting or 1)
+            if chunk:
+                buf.extend(chunk)
+                # Look for header
+                for i in range(len(buf) - 1):
+                    if buf[i] == 0x59 and buf[i + 1] == 0x59:
+                        logger.info(f"    {port}: TF-02 Pro header detected ({len(buf)} bytes read)")
+                        return True
+        logger.debug(f"    {port}: no TF-02 header in {len(buf)} bytes")
+        return False
 
     def _read_loop(self) -> None:
         """Background thread: continuously parse LiDAR frames."""
