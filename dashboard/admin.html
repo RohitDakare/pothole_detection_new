@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PotholeIQ — Admin Panel</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap"
+        rel="stylesheet" />
+    <style>
+        :root {
+            --bg: #080c14;
+            --surface: #0f1623;
+            --surface2: #162035;
+            --border: rgba(255, 255, 255, 0.07);
+            --text: #e8edf5;
+            --muted: #6b7691;
+            --accent: #4f8ef7;
+            --red: #f04f5a;
+            --green: #22c55e;
+            --orange: #f97316;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            padding: 2rem 1rem;
+        }
+
+        .mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        header {
+            width: 100%;
+            max-width: 700px;
+            margin-bottom: 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        header h1 {
+            font-size: 1.3rem;
+            font-weight: 700;
+            background: linear-gradient(90deg, var(--accent), #a78bfa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        header a {
+            color: var(--muted);
+            font-size: .8rem;
+            text-decoration: none;
+            border: 1px solid var(--border);
+            padding: 5px 14px;
+            border-radius: 8px;
+            transition: color .2s, border-color .2s;
+        }
+
+        header a:hover {
+            color: var(--accent);
+            border-color: var(--accent);
+        }
+
+        .card {
+            width: 100%;
+            max-width: 700px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .card-title {
+            font-size: .75rem;
+            text-transform: uppercase;
+            letter-spacing: .07em;
+            color: var(--muted);
+            margin-bottom: 1rem;
+            font-weight: 600;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, .04);
+            font-size: .83rem;
+        }
+
+        .stat-row:last-child {
+            border: none;
+        }
+
+        .stat-val {
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--accent);
+        }
+
+        .btn-row {
+            display: flex;
+            gap: .75rem;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: .65rem 1.25rem;
+            border: none;
+            border-radius: 10px;
+            font-family: 'Inter', sans-serif;
+            font-size: .8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: filter .2s, transform .1s;
+        }
+
+        .btn:active {
+            transform: scale(.97);
+        }
+
+        .btn:hover {
+            filter: brightness(1.12);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #dc2626, var(--red));
+            color: #fff;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent), #7c3aed);
+            color: #fff;
+        }
+
+        .btn-warn {
+            background: linear-gradient(135deg, var(--orange), #dc7509);
+            color: #fff;
+        }
+
+        .log-box {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: .72rem;
+            color: var(--muted);
+            min-height: 80px;
+            max-height: 180px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            line-height: 1.5;
+        }
+
+        .log-box .ok {
+            color: var(--green);
+        }
+
+        .log-box .err {
+            color: var(--red);
+        }
+
+        .badge-red {
+            color: var(--red);
+        }
+
+        .badge-orange {
+            color: var(--orange);
+        }
+
+        .badge-green {
+            color: var(--green);
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>⚙️ PotholeIQ Admin</h1>
+        <a href="/">← Dashboard</a>
+    </header>
+
+    <!-- Live Stats -->
+    <div class="card">
+        <div class="card-title">Live Statistics</div>
+        <div class="stat-row"><span>Total Potholes</span> <span class="stat-val" id="sTotal">—</span></div>
+        <div class="stat-row"><span>🔴 Critical</span> <span class="stat-val badge-red" id="sCritical">—</span></div>
+        <div class="stat-row"><span>🟠 Moderate</span> <span class="stat-val badge-orange" id="sModerate">—</span></div>
+        <div class="stat-row"><span>🟢 Repaired</span> <span class="stat-val badge-green" id="sRepaired">—</span></div>
+        <div class="stat-row"><span>🤖 YOLO Confirmed</span> <span class="stat-val" id="sYolo">—</span></div>
+        <div class="stat-row"><span>Avg Confidence</span> <span class="stat-val" id="sConf">—</span></div>
+        <div class="stat-row"><span>Avg Depth</span> <span class="stat-val" id="sAvgD">—</span></div>
+        <div class="stat-row"><span>Max Depth</span> <span class="stat-val" id="sMaxD">—</span></div>
+        <div class="stat-row"><span>Model Version</span> <span class="stat-val mono" id="sModel">—</span></div>
+    </div>
+
+    <!-- Danger Zone -->
+    <div class="card">
+        <div class="card-title">Actions</div>
+        <div class="btn-row">
+            <button class="btn btn-primary" onclick="refreshStats()">↻ Refresh Stats</button>
+            <button class="btn btn-warn" onclick="clearRepaired()">🧹 Clear Repaired</button>
+            <button class="btn btn-danger" onclick="nukeAll()">⚠️ Delete ALL Records</button>
+        </div>
+    </div>
+
+    <!-- Action Log -->
+    <div class="card">
+        <div class="card-title">Action Log</div>
+        <div class="log-box" id="logBox">Ready.\n</div>
+    </div>
+
+    <script>
+        const API = '';
+        const log = (msg, cls = '') => {
+            const box = document.getElementById('logBox');
+            const ts = new Date().toLocaleTimeString();
+            box.innerHTML += `<span class="${cls}">[${ts}] ${msg}</span>\n`;
+            box.scrollTop = box.scrollHeight;
+        };
+
+        async function refreshStats() {
+            try {
+                const s = await fetch(`${API}/api/potholes/stats`).then(r => r.json());
+                document.getElementById('sTotal').textContent = s.total ?? 0;
+                document.getElementById('sCritical').textContent = s.critical ?? 0;
+                document.getElementById('sModerate').textContent = s.moderate ?? 0;
+                document.getElementById('sRepaired').textContent = s.repaired ?? 0;
+                document.getElementById('sYolo').textContent = s.yolo_confirmed ?? 0;
+                document.getElementById('sConf').textContent = s.avg_yolo_conf != null ? (s.avg_yolo_conf * 100).toFixed(1) + '%' : '—';
+                document.getElementById('sAvgD').textContent = s.avg_depth != null ? s.avg_depth + ' cm' : '—';
+                document.getElementById('sMaxD').textContent = s.max_depth != null ? s.max_depth + ' cm' : '—';
+                document.getElementById('sModel').textContent = 'v' + (s.latest_model_version ?? 0);
+                log('Stats refreshed.', 'ok');
+            } catch (e) { log('Stats fetch failed: ' + e.message, 'err'); }
+        }
+
+        async function clearRepaired() {
+            if (!confirm('Remove all repaired (Green) potholes from the database?')) return;
+            try {
+                const all = await fetch(`${API}/api/potholes?status=Green&limit=9999`).then(r => r.json());
+                let n = 0;
+                for (const p of all) {
+                    await fetch(`${API}/api/potholes/${p.id}`, { method: 'DELETE' });
+                    n++;
+                }
+                log(`Deleted ${n} repaired records.`, 'ok');
+                refreshStats();
+            } catch (e) { log('Clear failed: ' + e.message, 'err'); }
+        }
+
+        async function nukeAll() {
+            if (!confirm('⚠️ DELETE ALL pothole records permanently? This cannot be undone!')) return;
+            try {
+                await fetch(`${API}/api/potholes`, { method: 'DELETE' });
+                log('All records deleted.', 'ok');
+                refreshStats();
+            } catch (e) { log('Delete all failed: ' + e.message, 'err'); }
+        }
+
+        refreshStats();
+    </script>
+</body>
+
+</html>

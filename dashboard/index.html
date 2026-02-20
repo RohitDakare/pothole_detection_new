@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PotholeIQ — Live Detection Dashboard</title>
+  <meta name="description" content="Real-time pothole detection map powered by TF-02 Pro LiDAR + YOLO AI on Raspberry Pi 4B" />
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ░░ SIDEBAR ░░ -->
+<aside class="sidebar" id="sidebar">
+
+  <!-- Logo -->
+  <div class="sidebar-header">
+    <div class="logo">
+      <div class="logo-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 7h18M3 12h18M3 17h10"/>
+          <circle cx="19" cy="17" r="3" fill="#ef4444" stroke="none"/>
+        </svg>
+      </div>
+      <div>
+        <span class="logo-title">PotholeIQ</span>
+        <span class="logo-sub">Real-Time Detection</span>
+      </div>
+    </div>
+    <button class="sidebar-toggle" id="sidebarToggle" title="Toggle sidebar">☰</button>
+  </div>
+
+  <!-- Live Stats -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <span class="stat-num" id="statTotal">0</span>
+      <span class="stat-lbl">Total</span>
+    </div>
+    <div class="stat-card red">
+      <span class="stat-num" id="statCritical">0</span>
+      <span class="stat-lbl">Critical</span>
+    </div>
+    <div class="stat-card orange">
+      <span class="stat-num" id="statModerate">0</span>
+      <span class="stat-lbl">Moderate</span>
+    </div>
+    <div class="stat-card green">
+      <span class="stat-num" id="statRepaired">0</span>
+      <span class="stat-lbl">Repaired</span>
+    </div>
+  </div>
+
+  <!-- AI Model Info -->
+  <div class="model-panel">
+    <div class="model-header">
+      <span class="model-icon">🤖</span>
+      <span class="model-title">YOLOv8 Online Learning</span>
+      <span class="live-dot" id="liveDot"></span>
+    </div>
+    <div class="model-row">
+      <span class="model-key">Model Version</span>
+      <span class="model-val mono" id="modelVersion">—</span>
+    </div>
+    <div class="model-row">
+      <span class="model-key">YOLO Confirmed</span>
+      <span class="model-val" id="modelYoloRate">—</span>
+    </div>
+    <div class="model-row">
+      <span class="model-key">Avg Confidence</span>
+      <span class="model-val" id="modelAvgConf">—</span>
+    </div>
+    <div class="model-row">
+      <span class="model-key">Avg Depth</span>
+      <span class="model-val" id="modelAvgDepth">—</span>
+    </div>
+    <div class="model-row">
+      <span class="model-key">Max Depth</span>
+      <span class="model-val mono" id="modelMaxDepth">—</span>
+    </div>
+  </div>
+
+  <!-- Filter Bar -->
+  <div class="filter-bar">
+    <button class="filter-btn active" data-filter="all">All</button>
+    <button class="filter-btn red" data-filter="Red">🔴 Critical</button>
+    <button class="filter-btn orange" data-filter="Orange">🟠 Moderate</button>
+    <button class="filter-btn green" data-filter="Green">🟢 Repaired</button>
+  </div>
+
+  <!-- Pothole List -->
+  <div class="pothole-list" id="potholeList">
+    <div class="list-empty" id="listEmpty">
+      <div class="empty-icon">📡</div>
+      <p>Awaiting detections…</p>
+      <p class="empty-sub">LiDAR + YOLO active</p>
+    </div>
+  </div>
+
+  <!-- Connection Status -->
+  <div class="conn-bar">
+    <span class="conn-dot" id="connDot"></span>
+    <span id="connStatus">Connecting…</span>
+    <span class="conn-refresh" onclick="refreshNow()" title="Refresh now">↻</span>
+  </div>
+
+</aside>
+
+<!-- ░░ MAIN CONTENT ░░ -->
+<main class="main-content">
+
+  <!-- Top bar -->
+  <div class="topbar">
+    <div class="topbar-left">
+      <span class="topbar-title">Live Pothole Map</span>
+      <span class="topbar-sub" id="lastUpdate">—</span>
+    </div>
+    <div class="topbar-right">
+      <div class="search-wrap">
+        <input type="text" class="search-input" id="searchInput"
+               placeholder="Search ID, severity…" oninput="applySearch()" />
+      </div>
+      <a href="/admin" class="btn-outline">Admin ↗</a>
+    </div>
+  </div>
+
+  <!-- Map -->
+  <div id="map"></div>
+
+  <!-- Detail Panel (slides in from right) -->
+  <div class="detail-panel" id="detailPanel">
+    <div class="detail-header">
+      <div>
+        <h2 id="detailTitle">Pothole Details</h2>
+        <span class="detail-badge" id="detailBadge">—</span>
+      </div>
+      <button class="detail-close" onclick="closeDetail()">✕</button>
+    </div>
+
+    <div class="detail-body">
+      <!-- Depth bar -->
+      <div class="depth-bar-wrap">
+        <div class="depth-bar-label">
+          <span>Depth</span><span id="detailDepthVal">—</span>
+        </div>
+        <div class="depth-bar-track">
+          <div class="depth-bar-fill" id="detailDepthBar"></div>
+        </div>
+      </div>
+
+      <!-- Dimension pills -->
+      <div class="dim-grid">
+        <div class="dim-pill">
+          <span class="dim-val" id="dLength">—</span>
+          <span class="dim-lbl">Length cm</span>
+        </div>
+        <div class="dim-pill">
+          <span class="dim-val" id="dWidth">—</span>
+          <span class="dim-lbl">Width cm</span>
+        </div>
+        <div class="dim-pill">
+          <span class="dim-val" id="dVolume">—</span>
+          <span class="dim-lbl">Volume cm³</span>
+        </div>
+        <div class="dim-pill">
+          <span class="dim-val" id="dSamples">—</span>
+          <span class="dim-lbl">LiDAR Hits</span>
+        </div>
+      </div>
+
+      <!-- Meta rows -->
+      <div class="meta-list">
+        <div class="meta-row">
+          <span class="meta-key">🤖 YOLO</span>
+          <span class="meta-val" id="dYolo">—</span>
+        </div>
+        <div class="meta-row">
+          <span class="meta-key">📍 GPS</span>
+          <span class="meta-val mono" id="dCoords">—</span>
+        </div>
+        <div class="meta-row">
+          <span class="meta-key">⏱ Detected</span>
+          <span class="meta-val" id="dTime">—</span>
+        </div>
+        <div class="meta-row">
+          <span class="meta-key">🏷 Status</span>
+          <span class="meta-val" id="dStatus">—</span>
+        </div>
+        <div class="meta-row">
+          <span class="meta-key">🔢 Model v</span>
+          <span class="meta-val mono" id="dModelVer">—</span>
+        </div>
+      </div>
+
+      <!-- Depth profile sparkline -->
+      <div class="sparkline-wrap">
+        <span class="sparkline-label">Depth Profile (LiDAR samples)</span>
+        <canvas id="sparklineCanvas" width="300" height="60"></canvas>
+      </div>
+
+      <!-- Action buttons -->
+      <div class="detail-actions">
+        <button class="btn-repair" id="btnRepair" onclick="repairCurrent()">
+          ✓ Mark Repaired
+        </button>
+        <button class="btn-danger" id="btnDelete" onclick="deleteCurrent()">
+          🗑 Delete
+        </button>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- Scripts -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
