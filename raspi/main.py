@@ -386,6 +386,7 @@ class PotholeDetectionSystem:
 
         INTERVAL = 1.0 / self.cfg.lidar.frame_hz          # 10 ms
         YOLO_SCAN_INTERVAL = 64                             # frames between YOLO sweeps
+        LOG_DATA_INTERVAL = int(self.cfg.lidar.frame_hz)   # log data every ~1 second
         next_tick = time.perf_counter()
 
         road_z = 0.0                                        # road-profile Z accumulator
@@ -416,6 +417,29 @@ class PotholeDetectionSystem:
                 "lat": 0.0, "lon": 0.0, "fixed": False
             }
             self.event_tracker.feed(depth_cm, t_frame_start, gps)
+
+            # ── 📊 Periodic data log (~every 1 s) ─────────────────────────
+            if self._frame_count % LOG_DATA_INTERVAL == 0:
+                runtime_s = time.time() - self._start_time
+                gps_fix   = "✓ Fix" if gps.get("fixed") else "✗ No fix"
+                gps_lat   = gps.get("lat", 0.0)
+                gps_lon   = gps.get("lon", 0.0)
+                gps_spd   = gps.get("speed_kmh", 0.0)
+                baseline  = self.depth_builder.get_baseline() if hasattr(self.depth_builder, "get_baseline") else "N/A"
+                evt_state = getattr(self.event_tracker, "_state", "—")
+
+                self.log.info(
+                    f"📊 DATA | "
+                    f"Frame: {self._frame_count:>7,} | "
+                    f"LiDAR: {raw_cm:>7.2f} cm | "
+                    f"Depth: {depth_cm:>6.2f} cm | "
+                    f"Baseline: {baseline} | "
+                    f"GPS: {gps_fix} ({gps_lat:.6f}, {gps_lon:.6f}) "
+                    f"Spd: {gps_spd:.1f} km/h | "
+                    f"Tracker: {evt_state} | "
+                    f"Detections: {self._detection_count} | "
+                    f"Runtime: {runtime_s:.0f}s"
+                )
 
             # ── 5. Road-profile telemetry ──────────────────────────────────
             road_z += self.cfg.detection.vehicle_speed_cms * INTERVAL
